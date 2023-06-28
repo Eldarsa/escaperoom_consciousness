@@ -1,8 +1,8 @@
 #include <Arduino.h>
 
 #define PRESSURE_SENS A0
-#define EYE_LID_POS_RIGHT A1
-#define EYE_LID_POS_LEFT A2
+#define EYE_LID_POS_RIGHT A2
+#define EYE_LID_POS_LEFT A1
 #define CHEST_RIGHT 3
 #define CHEST_LEFT 6
 #define ONE_A 7 // Must be PWM
