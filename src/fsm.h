@@ -15,19 +15,6 @@
 
 enum state {INIT, AIRWAY, BREATHING, CIRCULATION, PAIN_RESPONSE, IDLE};
 
-static state current_state;
-static unsigned long previous_time_stamp{0};
-static bool inhaling;
-static unsigned long inhaling_time_stamp{0};
-unsigned long current_time;
-uint16_t current_pressure;
-static unsigned long pressure_time_stamp{0};
-static unsigned long blink_time_stamp{0};
-static unsigned long right_eye_pos{0};
-static unsigned long left_eye_pos{0};
-static unsigned long right_eye_lim[2];
-static unsigned long left_eye_lim[2];
-
 /* System parameters, to be adjusted accourding to function behaviour*/
 const uint16_t IDLE_RESPIRATORY_RATE = 13; // Denoted in cycles per minute
 const uint16_t PAIN_RESPIRATORY_RATE = 35; // Denoted in cycles per minute
@@ -45,17 +32,49 @@ const uint32_t IDLE_RESPIRATORY_RATE_MS = (60UL*1000UL) / IDLE_RESPIRATORY_RATE;
 const uint32_t PAIN_RESPIRATORY_RATE_MS = (60UL*1000UL) / PAIN_RESPIRATORY_RATE; //ms between each breath in pain response state
 const uint32_t BLINKING_FREQ_MS = (60UL*1000UL) / BLINKING_FREQ;
 
-/*Functions*/
-void init_eyes();
+/* System functions */
 
-//void set_eyelid_motor_speed(char eye, char dir, int speed);
-int set_eyelid_position(char eye, int pos, int speed = 150);
-int get_eyelid_position(char eye);
+// Stops the motion of the eye(s) by disabling PWM signals to the motors
+// Parameter 'eye' can be 'R' for Right, 'L' for Left, or 'B' for Both.
+void eyelid_stop(char eye);
+
+// Immediately stops the motion of the eye(s) by applying a brake using the H-Bridge.
+// Parameter 'eye' can be 'R' for Right, 'L' for Left, or 'B' for Both.
+void fast_eyelid_stop(char eye);
+
+// Identifies the physical limits of the eyelid motor in a given direction by driving the motor until it stops moving.
+// Parameter 'eye' can be 'R' for Right or 'L' for Left.
+// Parameter 'dir' can be 'U' for Up or 'D' for Down.
 int find_eyelid_limit(char eye, char dir);
-void close_eye(char eye, int speed = 150);
-void open_eye(char eye, int speed = 150);
 
-void fast_eyelid_stop(char eye = 'B');
+// Moves the eyelid(s) to a specified position at a defined speed.
+// Parameter 'eye' can be 'R' for Right, 'L' for Left, or 'B' for Both.
+// Parameter 'targetPos' is the desired position (0-100).
+// Parameter 'speed' is the speed of motion (PWM duty cycle, 0-255).
+int set_eyelid_position(char eye, int targetPos, int speed);
 
-void printState(int state);
+// Helper function for set_eyelid_position that sets the motor signals-
+// Returns true if the desired position has been reached, false otherwise.
+// Stops the motor once target position is achieved.
+bool drive_eyelid_to_position(char eye, int currentPos, int targetPos, int speed, int upDrivePin, int downDrivePin);
 
+// Returns the current position of an eyelid as a percentage.
+// Parameter 'eye' can be 'R' for Right or 'L' for Left.
+int get_eyelid_position(char eye);
+
+// Closes the specified eye(s) at a defined speed.
+// Parameter 'eye' can be 'R' for Right, 'L' for Left, or 'B' for Both.
+// Parameter 'speed' is the speed of motion (PWM duty cycle, 0-255).
+void close_eye(char eye, int speed);
+
+// Opens the specified eye(s) at a defined speed.
+// Parameter 'eye' can be 'R' for Right, 'L' for Left, or 'B' for Both.
+// Parameter 'speed' is the speed of motion (PWM duty cycle, 0-255).
+void open_eye(char eye, int speed);
+
+// Makes the eye(s) blink once. Closes the eye(s), waits, and then opens the eye(s).
+// Parameter 'openDelay' specifies the delay time in milliseconds before the eye(s) are re-opened.
+void blink(int openDelay);
+
+// Initializes and calibrates the eyelid mechanism.
+void init_eyes();
