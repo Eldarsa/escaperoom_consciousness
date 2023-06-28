@@ -358,13 +358,19 @@ void setup() {
   Serial.println("Program Start \n");
 }
 
+
+// Check if the current time exceeds a certain interval from a given timestamp
+bool check_time_lapse(unsigned long timestamp, unsigned long interval){
+    return (current_time - timestamp >= interval);
+}
+
 void loop() {
 
   current_time = millis();
   right_eye_pos = analogRead(EYE_LID_POS_RIGHT);
   left_eye_pos = analogRead(EYE_LID_POS_LEFT);
   
-  printState(current_state);
+  print_state(current_state);
 
   switch(current_state){
     case INIT:
@@ -399,71 +405,56 @@ void loop() {
     case PAIN_RESPONSE:
 
       // State transition condition
-      if(current_time - blink_time_stamp >= BLINKING_FREQ_MS)
+      if(check_time_lapse(blink_time_stamp, BLINKING_FREQ_MS))
       {
         Serial.println("Blink");
         Serial.println(right_eye_pos);
-        if(get_eyelid_position('R') >= 60) // Right eye is open
-        {
-          set_eyelid_position('R', 80, 1);
-          blink_time_stamp = millis();
-        }
-        }
-        if((get_eyelid_position('R') < 40) && (millis() - blink_time_stamp >= 150))
-        {
-          
-        }
+
+      }
         
+      if(check_time_lapse(previous_time_stamp, PAIN_STATE_TIME)) 
+      {
+        current_state = IDLE;
+        previous_time_stamp = millis();
+        break;
+      }
 
-        if(current_time - previous_time_stamp >= PAIN_STATE_TIME) 
-        {
-          current_state = IDLE;
-          previous_time_stamp = millis();
-          break;
-        }
-
-        // STATE sensor comparisons and set actuators
-        if((current_time - inhaling_time_stamp >= PAIN_RESPIRATORY_RATE_MS) && inhaling == false)
-        {
-          startInhaling();
-          break;
-        }
-        else if((current_time - (inhaling_time_stamp) >= PAIN_INHALATION_SPEED) && inhaling == true)
-        {
-          stopInhaling();
-          break;
-        }
-
-
+      // STATE sensor comparisons and set actuators
+      if(check_time_lapse(inhaling_time_stamp, PAIN_RESPIRATORY_RATE_MS) && inhaling == false)
+      {
+        startInhaling();
+        break;
+      }
+      else if(check_time_lapse(inhaling_time_stamp, PAIN_INHALATION_SPEED) && inhaling == true)
+      {
+        stopInhaling();
+        break;
+      }
 
     case IDLE:
-      
-      
+    
       /* STATE sensor comparisons and set actuators
       Breathing: Normal and bilateral breathing
       */
 
       Serial.println("In IDLE state \n");
 
-      if((current_time - inhaling_time_stamp >= IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
+      if(check_time_lapse(inhaling_time_stamp, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
       {
-      //Serial.println("In loop \n");
         startInhaling();
         break;
       }
-      else if((current_time - (inhaling_time_stamp) >= RESPIRATORY_INHALATION_SPEED) && inhaling == true)
-      {
-      //Serial.println("In loop B \n");
+
+      if(check_time_lapse(inhaling_time_stamp, RESPIRATORY_INHALATION_SPEED) && inhaling == true){
         stopInhaling();
-        break;
       }
 
-      if(current_time - pressure_time_stamp >= DELTA_T_PRESSURE_MS) {
+      if(check_time_lapse(pressure_time_stamp, DELTA_T_PRESSURE_MS)){
         pressure_time_stamp = millis();
         current_pressure = analogRead(A0);
       }
 
-      if(current_time - pressure_time_stamp >= DELTA_T2) {
+      if(check_time_lapse(pressure_time_stamp, DELTA_T2)) {
         checkForPainResponse();
       }
       break;
@@ -471,7 +462,6 @@ void loop() {
     default:
       break;
   }
-  
 }
 
 // Starts the inhaling process
@@ -497,7 +487,7 @@ void checkForPainResponse() {
   }
 }
 
-void printState(int state)
+void print_state(int state)
 {
   if(state == 0)
   {
