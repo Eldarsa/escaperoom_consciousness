@@ -12,6 +12,8 @@
 #define BUILT_IN_LED 13
 #define ENABLE_R 22
 #define ENABLE_L 24
+#define RIGHT_ARM_SIGNAL 32
+#define PNEUMOTHORAX_IN 26
 
 enum state {INIT, AIRWAY, BREATHING, CIRCULATION, PAIN_RESPONSE, IDLE};
 
@@ -74,10 +76,17 @@ void open_eye(char eye, int speed);
 
 // Makes the eye(s) blink once. Closes the eye(s), waits, and then opens the eye(s).
 // Parameter 'openDelay' specifies the delay time in milliseconds before the eye(s) are re-opened.
-void blink(int openDelay);
+void blink(int openDelay = 20);
 
 // Initializes and calibrates the eyelid mechanism.
 void init_eyes();
 
+void startInhaling(char chest = 'B');
 
-void print_state();
+void stopInhaling(char chest = 'B');
+
+bool checkForPainResponse();
+
+void triggerRightArm();
+
+void print_state(int state);
