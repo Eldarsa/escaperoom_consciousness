@@ -15,6 +15,11 @@
 #define RIGHT_ARM_SIGNAL 32
 #define PNEUMOTHORAX_IN 26
 
+#define FX_AIRWAY_OBSTRUCTION 20
+#define FX_REGULAR_BREATHING 21
+#define FX_PNEUMOTHORAX_BREATHING 22
+#define FX_BLEEDING 23
+
 enum state {INIT, AIRWAY, BREATHING, CIRCULATION, PAIN_RESPONSE, IDLE};
 
 /* System parameters, to be adjusted accourding to function behaviour*/
