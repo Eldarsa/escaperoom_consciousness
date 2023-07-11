@@ -323,3 +323,36 @@ void init_eyes()
   Serial.println("Eyes initiated.");
 
 }
+
+void test_eyes()
+{
+  Serial.println("Eye test ");
+
+  right_eye_pos = analogRead(EYE_LID_POS_RIGHT);
+  left_eye_pos = analogRead(EYE_LID_POS_LEFT);
+
+  analogWrite(ONE_A, 0);
+  analogWrite(TWO_A, 0);
+  analogWrite(ONE_B, 0);
+  analogWrite(TWO_B, 0);
+
+  Serial.println("Enabling left");
+  digitalWrite(ENABLE_L, 1);
+  digitalWrite(ENABLE_R, 1);
+
+
+  int  upDrivePin = ONE_B;
+  int  downDrivePin = TWO_B;
+  int  readPin = EYE_LID_POS_LEFT;
+
+  int UP_SPEED = 200;
+  int DOWN_SPEED = 200;
+
+  analogWrite(upDrivePin, UP_SPEED);
+
+  delay(5000);
+
+  analogWrite(upDrivePin, 0);
+
+  //analogWrite(downDrivePin, DOWN_SPEED);
+}

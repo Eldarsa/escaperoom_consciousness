@@ -50,3 +50,5 @@ void blink(int openDelay = 250);
 
 // Initializes and calibrates the eyelid mechanism.
 void init_eyes();
+
+void test_eyes();

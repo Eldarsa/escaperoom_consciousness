@@ -7,12 +7,15 @@
 
 static state current_state;
 
-unsigned long current_time;
+unsigned long temp_timestamp;
+
 uint16_t current_pressure;
 static unsigned long pressure_time_stamp{0};
 static unsigned long blink_time_stamp{0};
 
 static bool triggerArmOnPainResponse = true;
+
+static bool stateTransitionMark = true;
 
 void setup() {
   TCCR2B = TCCR2B & (B11111000 | B00000001); // Set D9 and D10 pin to 30 kHz
@@ -60,6 +63,7 @@ void setup() {
 
   current_state = INIT;
   previous_time_stamp = millis();
+  temp_timestamp = millis();
   current_pressure = analogRead(A0);
   
   Serial.begin(9600); //For debugging
@@ -80,45 +84,63 @@ void setup() {
 
 void loop() {
 
-  current_time = millis();
-
-  //print_state(current_state);
+  print_state(current_state);
 
   switch(current_state){
     case INIT:
       init_eyes();
+      //test_eyes();
       current_state = AIRWAY;
       inhaling = false;
       break;
 
     case AIRWAY:
 
+      if(stateTransitionMark){
+        digitalWrite(FX_REGULAR_BREATHING, LOW);
+        stateTransitionMark = false;
+      }
+
+      if(millis() - temp_timestamp >= 1000){
+        int read = digitalRead(AIRWAY_IN);
+        Serial.println("Airway pin state: " + read);
+      }
+      //digitalWrite(FX_AIRWAY_DONE, LOW);
+
       //Airway freed
-      if(digitalRead(AIRWAY_IN))
+      if(!digitalRead(AIRWAY_IN))
       {
+        Serial.println("Transitioning to Breathing state \n");
         current_state = BREATHING;
+        stateTransitionMark = true;
+        //(FX_AIRWAY_DONE, HIGH);
+        digitalWrite(FX_REGULAR_BREATHING, HIGH);
       }
 
       break;
 
     case BREATHING:
 
-      breatheBilaterally(current_time);
+      breatheBilaterally();
+      digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
 
       // Pneumothorax correct
-      if(digitalRead(PNEUMOTHORAX_IN))
+      if(!digitalRead(PNEUMOTHORAX_IN))
       {
+        Serial.println("Transitioning to Circulation state \n");
         current_state = CIRCULATION;
+        digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
       }
       break;
 
     case CIRCULATION:
 
-      breatheNormally(current_time);
+      breatheNormally();
 
       // Bleeding stopped
-      if(digitalRead(BLEEDING_IN))
+      if(!digitalRead(BLEEDING_IN))
       {
+        Serial.println("Transitioning to Bleeding state \n");
         current_state = IDLE;
       }
       break;
@@ -127,13 +149,14 @@ void loop() {
 
       digitalWrite(FX_REGULAR_BREATHING, LOW);
 
-      breatheNormally(current_time);
+      breatheNormally();
 
       if(checkForPainResponse())
       {
           previous_time_stamp = millis();
           digitalWrite(FX_REGULAR_BREATHING, HIGH);
           current_state = PAIN_RESPONSE;
+          Serial.println("Transitioning to Pain Response state \n");
       }
 
       break;
@@ -143,7 +166,7 @@ void loop() {
 
       digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
 
-      breatheInPain(current_time);
+      breatheInPain();
 
       if(triggerArmOnPainResponse)
       {
@@ -156,14 +179,14 @@ void loop() {
         triggerArmOnPainResponse = false; 
       }
 
-      if(time_interval_passed(blink_time_stamp, current_time, BLINKING_FREQ_MS))
+      if(time_interval_passed(blink_time_stamp, BLINKING_FREQ_MS))
       {
         Serial.println("Blinking");
         blink();
         blink_time_stamp = millis();
       }
         
-      if(time_interval_passed(previous_time_stamp, current_time, PAIN_STATE_TIME)) 
+      if(time_interval_passed(previous_time_stamp, PAIN_STATE_TIME)) 
       {
         current_state = IDLE;
         previous_time_stamp = millis();
@@ -180,12 +203,13 @@ void loop() {
 
 bool checkForPainResponse()
 {
-    if(time_interval_passed(pressure_time_stamp, current_time, DELTA_T_PRESSURE_MS)){
+
+    if(time_interval_passed(pressure_time_stamp, DELTA_T_PRESSURE_MS)){
       pressure_time_stamp = millis();
       current_pressure = analogRead(A0);
     }
 
-    if(time_interval_passed(pressure_time_stamp, current_time, DELTA_T2)) {
+    if(time_interval_passed(pressure_time_stamp, DELTA_T2)) {
       if((uint16_t)(analogRead(PRESSURE_SENS)) >= (current_pressure + DELTA_P_PRESSURE)) {
         return true;
       }

@@ -43,42 +43,44 @@ void stopInhaling(char chest) {
   inhaling = false;
 }
 
-void breatheNormally(unsigned long current_time)
+void breatheNormally()
 {
-    if(time_interval_passed(inhaling_time_stamp, current_time, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
+    if(time_interval_passed(inhaling_time_stamp, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
     {
         startInhaling();
         return;
     }
 
-    if(time_interval_passed(inhaling_time_stamp, current_time, RESPIRATORY_INHALATION_SPEED) && inhaling == true){
+    if(time_interval_passed(inhaling_time_stamp, RESPIRATORY_INHALATION_SPEED) && inhaling == true){
         stopInhaling();
         return;
     }
 }
 
-void breatheInPain(unsigned long current_time)
+void breatheInPain()
 {
-      if(time_interval_passed(inhaling_time_stamp, current_time, PAIN_RESPIRATORY_RATE_MS) && inhaling == false)
+      if(time_interval_passed(inhaling_time_stamp, PAIN_RESPIRATORY_RATE_MS) && inhaling == false)
       {
         startInhaling();
         return;
       }
-      else if(time_interval_passed(inhaling_time_stamp, current_time, PAIN_INHALATION_SPEED) && inhaling == true)
+      else if(time_interval_passed(inhaling_time_stamp, PAIN_INHALATION_SPEED) && inhaling == true)
       {
         stopInhaling();
         return;
       }
 }
 
-void breatheBilaterally(unsigned long current_time)
+void breatheBilaterally()
 {
-      if(time_interval_passed(inhaling_time_stamp, current_time, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
+      if(time_interval_passed(inhaling_time_stamp, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
       {
         startInhaling('L');
+        analogWrite(CHEST_RIGHT, 0);
         return;
       }
-      else if(time_interval_passed(inhaling_time_stamp, current_time, PAIN_INHALATION_SPEED) && inhaling == true)
+
+      else if(time_interval_passed(inhaling_time_stamp, PAIN_INHALATION_SPEED) && inhaling == true)
       {
         stopInhaling('L');
         return;
