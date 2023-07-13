@@ -12,7 +12,8 @@ Here are the mappings we have chosen here:
 
 T00 - Airway
 T01 - Airway done
-T02 - Pneumothorax
+T02HOLDL - Pneumothorax
 T03 - Pneumothorax done
-T04 - Regular breathing
-T05 - Bleeding 
+T04HOLDL - Bleeding
+T05 - Breathe In
+T06 - Breathe Out

@@ -12,10 +12,10 @@ unsigned long temp_timestamp;
 uint16_t current_pressure;
 static unsigned long pressure_time_stamp{0};
 static unsigned long blink_time_stamp{0};
+static unsigned long choking_sound_timestamp{0};
 
 static bool triggerArmOnPainResponse = true;
 
-static bool stateTransitionMark = true;
 
 void setup() {
   TCCR2B = TCCR2B & (B11111000 | B00000001); // Set D9 and D10 pin to 30 kHz
@@ -40,9 +40,9 @@ void setup() {
   pinMode(FX_AIRWAY_DONE, OUTPUT);
   pinMode(FX_PNEUMOTHORAX_BREATHING, OUTPUT);
   pinMode(FX_PNEUMOTHORAX_DONE, OUTPUT);
-  pinMode(FX_REGULAR_BREATHING, OUTPUT);
   pinMode(FX_BLEEDING, OUTPUT);
-  pinMode(FX_06_UNUSED, OUTPUT);
+  pinMode(FX_BREATHE_IN, OUTPUT);
+  pinMode(FX_BREATHE_OUT, OUTPUT);
   pinMode(FX_07_UNUSED, OUTPUT);
   pinMode(FX_08_UNUSED, OUTPUT);
   pinMode(FX_09_UNUSED, OUTPUT);
@@ -53,9 +53,9 @@ void setup() {
   digitalWrite(FX_AIRWAY_DONE, HIGH);
   digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
   digitalWrite(FX_PNEUMOTHORAX_DONE, HIGH);
-  digitalWrite(FX_REGULAR_BREATHING, HIGH);
-  digitalWrite(FX_BLEEDING, HIGH), 
-  digitalWrite(FX_06_UNUSED, HIGH);
+  digitalWrite(FX_BLEEDING, HIGH);
+  digitalWrite(FX_BREATHE_IN, HIGH), 
+  digitalWrite(FX_BREATHE_OUT, HIGH);
   digitalWrite(FX_07_UNUSED, HIGH);
   digitalWrite(FX_08_UNUSED, HIGH);
   digitalWrite(FX_09_UNUSED, HIGH);
@@ -64,6 +64,7 @@ void setup() {
   current_state = INIT;
   previous_time_stamp = millis();
   temp_timestamp = millis();
+  choking_sound_timestamp = millis();
   current_pressure = analogRead(A0);
   
   Serial.begin(9600); //For debugging
@@ -84,37 +85,30 @@ void setup() {
 
 void loop() {
 
-  print_state(current_state);
 
   switch(current_state){
     case INIT:
       init_eyes();
-      //test_eyes();
       current_state = AIRWAY;
       inhaling = false;
+      Serial.println("Transitioning to Airway state \n");
       break;
 
     case AIRWAY:
 
-      if(stateTransitionMark){
-        digitalWrite(FX_REGULAR_BREATHING, LOW);
-        stateTransitionMark = false;
+      // Trigger choking sound
+      if(time_interval_passed(choking_sound_timestamp, FX_AIRWAY_CHOKING_RATE_MS)) 
+      {
+        trigger_sound(FX_AIRWAY_OBSTRUCTION);
+        choking_sound_timestamp = millis();
       }
-
-      if(millis() - temp_timestamp >= 1000){
-        int read = digitalRead(AIRWAY_IN);
-        Serial.println("Airway pin state: " + read);
-      }
-      //digitalWrite(FX_AIRWAY_DONE, LOW);
 
       //Airway freed
       if(!digitalRead(AIRWAY_IN))
       {
         Serial.println("Transitioning to Breathing state \n");
         current_state = BREATHING;
-        stateTransitionMark = true;
-        //(FX_AIRWAY_DONE, HIGH);
-        digitalWrite(FX_REGULAR_BREATHING, HIGH);
+        trigger_sound(FX_AIRWAY_DONE);
       }
 
       break;
@@ -124,37 +118,43 @@ void loop() {
       breatheBilaterally();
       digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
 
+        int buttonState = digitalRead(PNEUMOTHORAX_IN);
+      //print_state(current_state);
+      Serial.print("  PT1: "); Serial.print(buttonState);
+      Serial.print("\n");
+
       // Pneumothorax correct
-      if(!digitalRead(PNEUMOTHORAX_IN))
+      if(digitalRead(PNEUMOTHORAX_IN))
       {
+        digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
+        trigger_sound(FX_PNEUMOTHORAX_DONE);
         Serial.println("Transitioning to Circulation state \n");
         current_state = CIRCULATION;
-        digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
       }
       break;
 
     case CIRCULATION:
 
       breatheNormally();
+      digitalWrite(FX_BLEEDING, LOW);
 
       // Bleeding stopped
-      if(!digitalRead(BLEEDING_IN))
+      //if(digitalRead(BLEEDING_IN))
+      if(digitalRead(BLEEDING_IN))
       {
-        Serial.println("Transitioning to Bleeding state \n");
+        digitalWrite(FX_BLEEDING, HIGH);
+        Serial.println("Transitioning to IDLE state \n");
         current_state = IDLE;
       }
       break;
 
     case IDLE:  // DISABILITY and EXPOSURE
 
-      digitalWrite(FX_REGULAR_BREATHING, LOW);
-
-      breatheNormally();
+      breatheNormally(true);
 
       if(checkForPainResponse())
       {
           previous_time_stamp = millis();
-          digitalWrite(FX_REGULAR_BREATHING, HIGH);
           current_state = PAIN_RESPONSE;
           Serial.println("Transitioning to Pain Response state \n");
       }
@@ -192,10 +192,9 @@ void loop() {
         previous_time_stamp = millis();
         triggerArmOnPainResponse = true; // Reset
         digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
-
-        break;
       }
-
+      break;
+      
     default:
       break;
   }

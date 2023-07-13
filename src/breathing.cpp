@@ -43,16 +43,22 @@ void stopInhaling(char chest) {
   inhaling = false;
 }
 
-void breatheNormally()
+void breatheNormally(bool triggerSound)
 {
     if(time_interval_passed(inhaling_time_stamp, IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
     {
         startInhaling();
+        if(triggerSound) {
+          trigger_sound(FX_BREATHE_IN); 
+        }
         return;
     }
 
     if(time_interval_passed(inhaling_time_stamp, RESPIRATORY_INHALATION_SPEED) && inhaling == true){
         stopInhaling();
+        if(triggerSound) {
+          trigger_sound(FX_BREATHE_OUT); 
+        }
         return;
     }
 }

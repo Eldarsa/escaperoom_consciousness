@@ -21,8 +21,10 @@ void startInhaling(char chest = 'B');
 
 void stopInhaling(char chest = 'B');
 
-void breatheNormally();
+void breatheNormally(bool triggerSound = false);
 
 void breatheInPain();
 
 void breatheBilaterally();
+
+
