@@ -1,322 +1,21 @@
 #include <Arduino.h>
 #include "fsm.h"
+#include "eyes.h"
+#include "breathing.h"
+#include "utils.h"
+#include "defines.h"
 
+static state current_state;
 
-/* System functions */
+unsigned long temp_timestamp;
 
-void eyelid_stop(char eye)
-{
-  // 'B' for 'Both'
+uint16_t current_pressure;
+static unsigned long pressure_time_stamp{0};
+static unsigned long blink_time_stamp{0};
+static unsigned long choking_sound_timestamp{0};
 
-  // Right eye
-  if(eye == 'R' || eye == 'B'){ 
-    digitalWrite(ENABLE_R, HIGH);
-    analogWrite(ONE_A, 0);
-    analogWrite(TWO_A, 0);
-  }
+static bool triggerArmOnPainResponse = true;
 
-  // Left eye
-  if(eye == 'L' || eye == 'B'){
-    digitalWrite(ENABLE_L, HIGH);
-    analogWrite(ONE_B, 0);
-    analogWrite(TWO_B, 0);
-  }
-}
-
-void fast_eyelid_stop(char eye)
-{
-  // 'B' for 'Both'
-
-  // Right eye
-  if(eye == 'R' || eye == 'B'){ 
-    digitalWrite(ENABLE_R, HIGH);
-    digitalWrite(ONE_A, HIGH);
-    digitalWrite(TWO_A, HIGH);
-  }
-
-  // Left eye
-  if(eye == 'L' || eye == 'B'){
-    digitalWrite(ENABLE_L, HIGH);
-    digitalWrite(ONE_B, HIGH);
-    digitalWrite(TWO_B, HIGH);
-  }
-}
-
-int find_eyelid_limit(char eye, char dir){
-
-  bool limitFound;
-  int limit;
-  int readPin;
-
-  // ONE and TWO are the PWM pins that control the motor speed in each direction.
-  int upDrivePin, downDrivePin;
-  int UP_SPEED; 
-  int DOWN_SPEED; 
-  
-  // Set which eye to control
-  if(eye == 'R')
-  {
-    upDrivePin = ONE_A;
-    downDrivePin = TWO_A;
-    readPin = EYE_LID_POS_RIGHT;
-  }
-  else if(eye == 'L')
-  {
-    upDrivePin = ONE_B;
-    downDrivePin = TWO_B;
-    readPin = EYE_LID_POS_LEFT;
-  }
-  else
-  {
-    Serial.println("Invalid eye parameter. Use 'R' for right or 'L' for left.");
-    return -1;
-  }
-
-  // Set direction and speed
-  if(dir == 'U')
-  {
-    UP_SPEED = 200;
-    DOWN_SPEED = 0;
-  }
-  else if(dir == 'D')
-  {
-    UP_SPEED = 0;
-    DOWN_SPEED = 200;
-  }
-  else
-  {
-    Serial.println("Invalid eye parameter. Use 'U' for up or 'D' for down.");
-    return -1;
-  }
-
-  Serial.print("find_eyelid_limit: eye=");
-  Serial.print(eye);
-  Serial.print(", dir=");
-  Serial.println(dir);
-
-  int currentPos = analogRead(readPin);
-  int lastPos;
-
-  analogWrite(upDrivePin, UP_SPEED);
-  analogWrite(downDrivePin, DOWN_SPEED);
-
-  delay(250); // Just give the system some time to start moving
-
-  int iterations_not_moved = 0;
-  int iterations_treshold = 5;
-  int epsilon = 3;
-
-  while(!limitFound) {
-
-    lastPos = currentPos;
-    delay(40);
-    currentPos = analogRead(readPin);
-
-    // Check if there is a notable difference in movement from last iteration
-    if(abs(currentPos - lastPos) <= epsilon){
-      iterations_not_moved++;
-    }else{
-      iterations_not_moved = 0;
-    }
-
-    // If the number of iterations not moved exceed the threshold, stop.
-    if(iterations_not_moved >= iterations_treshold){
-      limitFound = true;
-      eyelid_stop(eye);
-    }
-  }
-
-  limit = analogRead(readPin);
-
-  // When limit is found
-  Serial.println("Limit found.");
-  Serial.print("Limit value: ");
-  Serial.println(limit);
-
-  return limit;
-}
-
-
-///   eye = 'L' (left) or 'R' (right)
-///   pos = reference as a value between 0 and 100
-///     - 100 => 100% open
-///     - 0   => 0% open
-///   speed = duty cycle value between 0 and 255
-///
-///   The position values are mapped from the max- and min-reads of the potentiometer, 
-///   which are found when the find_eyelid_limits is called during the setup.
-int set_eyelid_position(char eye, int targetPos, int speed)
-{
-  int readPin; 
-  int potMax, potMin;
-  int upDrivePin, downDrivePin;
-  
-  /* DEBUG
-  Serial.print("set_eyelid_position: eye=");
-  Serial.print(eye);
-  Serial.print(", pos=");
-  Serial.print(targetPos);
-  Serial.print(", speed=");
-  Serial.println(speed);
-  */
-
-  // Set which eye to control
-  if(eye == 'R')
-  {
-    upDrivePin = ONE_A;
-    downDrivePin = TWO_A;
-    readPin = EYE_LID_POS_RIGHT;
-    potMax = right_eye_lim[0];
-    potMin = right_eye_lim[1];
-  }
-  else if(eye == 'L')
-  {
-    upDrivePin = ONE_B;
-    downDrivePin = TWO_B;
-    readPin = EYE_LID_POS_LEFT;
-    potMax = left_eye_lim[0];
-    potMin = left_eye_lim[1];
-  }
-  else
-  {
-    Serial.println("Invalid eye parameter. Use 'R' for right or 'L' for left.");
-    return -1;
-  }
-
-  int currentPos = map(analogRead(readPin), potMin, potMax, 0, 100); 
-  char dir;
-
-  unsigned long previousMillis = millis();
-  int delayDuration = 10;
-  int epsilon = 5;
-
-  if(currentPos > targetPos + epsilon)
-  {
-    dir = 'D';
-    Serial.print("Direction: ");
-    Serial.println(dir);
-  }else if(currentPos < targetPos - epsilon)
-  {
-    dir = 'U';
-    Serial.print("Direction: ");
-    Serial.println(dir);
-  }else{
-      Serial.println("Position already correct!");
-      delay(1500);
-      return 0;
-  }
-
-  while(true){
-
-    unsigned long currentMillis = millis();
-    
-    // Control the number of checks per time frame
-    if(currentMillis - previousMillis >= delayDuration)
-    {
-      previousMillis = currentMillis;
-
-      currentPos = map(analogRead(readPin), potMin, potMax, 0, 100);
-
-      // During the loop
-      Serial.print("Current position: ");
-      Serial.println(currentPos);
-
-      // Check which direction to set the motor
-      if(dir == 'D' && currentPos > targetPos + epsilon)
-      {
-        analogWrite(upDrivePin, 0);
-        analogWrite(downDrivePin, speed);
-      }
-      else if(dir == 'U' && currentPos < targetPos - epsilon)
-      {
-        analogWrite(upDrivePin, speed);
-        analogWrite(downDrivePin, 0);
-      }
-      else
-      {
-        // The position is correct
-        eyelid_stop(eye);
-        Serial.println("Position found!");
-        delay(1500);
-        return 0;
-      }
-    }
-  }
-}
-
-///  Returns positions as a value between 0 and 100
-///     - 100 => 100% open
-///     - 0   => 0% open
-int get_eyelid_position(char eye)
-{
-  int readPin, potMin, potMax;
-
-  // Set which eye to control
-  if(eye == 'R')
-  {
-    readPin = EYE_LID_POS_RIGHT;
-    potMax = right_eye_lim[0];
-    potMin = right_eye_lim[1];
-  }
-  else if(eye == 'L')
-  {
-    readPin = EYE_LID_POS_LEFT;
-    potMax = left_eye_lim[0];
-    potMin = left_eye_lim[1];
-  }
-  else
-  {
-    Serial.println("Invalid eye parameter. Use 'R' for right or 'L' for left.");
-    return -1;
-  }
-
-  return map(analogRead(readPin), potMin, potMax, 0, 100);
-}
-
-// Convenience function
-void close_eye(char eye, int speed)
-{
-  set_eyelid_position(eye, 0, speed);   // '0' implies 0% open
-}
-
-// Convenience function
-void open_eye(char eye, int speed)
-{
-  set_eyelid_position(eye, 100, speed);  // '100' implies 100% open
-}
-
-void blink(int openDelay)
-{
-  close_eye('R', 250);
-  close_eye('L', 250);
-
-}
-
-void init_eyes()
-{
-  Serial.println("Initializing eyes... ");
-
-  // Set enable pins high
-  digitalWrite(ENABLE_R, 1);
-  digitalWrite(ENABLE_L, 1);
-  analogWrite(ONE_A, 0);
-  analogWrite(TWO_A, 0);
-  analogWrite(ONE_B, 0);
-  analogWrite(TWO_B, 0);
-
-  // Calibrate eyes
-  right_eye_lim[1] = find_eyelid_limit('R', 'D');
-  right_eye_lim[0] = find_eyelid_limit('R', 'U');
-  left_eye_lim[1] = find_eyelid_limit('L', 'D');
-  left_eye_lim[0] = find_eyelid_limit('L', 'U');
-
-  // Set default position
-  open_eye('L', 200);
-  open_eye('R', 200);
-
-  Serial.println("Eyes initiated.");
-
-}
 
 void setup() {
   TCCR2B = TCCR2B & (B11111000 | B00000001); // Set D9 and D10 pin to 30 kHz
@@ -332,9 +31,40 @@ void setup() {
   pinMode(TWO_A, OUTPUT);
   pinMode(ONE_B, OUTPUT);
   pinMode(TWO_B, OUTPUT);
+  pinMode(RIGHT_ARM_SIGNAL, OUTPUT);
+  pinMode(PNEUMOTHORAX_IN, INPUT); // NOT USED YET
+  pinMode(AIRWAY_IN, INPUT);
+
+  // Sound effect pins
+  pinMode(FX_AIRWAY_OBSTRUCTION, OUTPUT);
+  pinMode(FX_AIRWAY_DONE, OUTPUT);
+  pinMode(FX_PNEUMOTHORAX_BREATHING, OUTPUT);
+  pinMode(FX_PNEUMOTHORAX_DONE, OUTPUT);
+  pinMode(FX_BLEEDING, OUTPUT);
+  pinMode(FX_BREATHE_IN, OUTPUT);
+  pinMode(FX_BREATHE_OUT, OUTPUT);
+  pinMode(FX_07_UNUSED, OUTPUT);
+  pinMode(FX_08_UNUSED, OUTPUT);
+  pinMode(FX_09_UNUSED, OUTPUT);
+  pinMode(FX_10_UNUSED, OUTPUT);
+
+  // Set sound effects high to not play
+  digitalWrite(FX_AIRWAY_OBSTRUCTION, HIGH);
+  digitalWrite(FX_AIRWAY_DONE, HIGH);
+  digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
+  digitalWrite(FX_PNEUMOTHORAX_DONE, HIGH);
+  digitalWrite(FX_BLEEDING, HIGH);
+  digitalWrite(FX_BREATHE_IN, HIGH), 
+  digitalWrite(FX_BREATHE_OUT, HIGH);
+  digitalWrite(FX_07_UNUSED, HIGH);
+  digitalWrite(FX_08_UNUSED, HIGH);
+  digitalWrite(FX_09_UNUSED, HIGH);
+  digitalWrite(FX_10_UNUSED, HIGH);
 
   current_state = INIT;
   previous_time_stamp = millis();
+  temp_timestamp = millis();
+  choking_sound_timestamp = millis();
   current_pressure = analogRead(A0);
   
   Serial.begin(9600); //For debugging
@@ -355,174 +85,134 @@ void setup() {
 
 void loop() {
 
-  current_time = millis();
-  right_eye_pos = analogRead(EYE_LID_POS_RIGHT);
-  left_eye_pos = analogRead(EYE_LID_POS_LEFT);
-  
-  printState(current_state);
 
   switch(current_state){
     case INIT:
       init_eyes();
-      current_state = IDLE;
+      current_state = AIRWAY;
+      inhaling = false;
+      Serial.println("Transitioning to Airway state \n");
       break;
 
     case AIRWAY:
-      // STATE sensor comparisons and set actuators
-      if(false) // State transition statement
-      {
 
+      // Trigger choking sound
+      if(time_interval_passed(choking_sound_timestamp, FX_AIRWAY_CHOKING_RATE_MS)) 
+      {
+        trigger_sound(FX_AIRWAY_OBSTRUCTION);
+        choking_sound_timestamp = millis();
       }
+
+      //Airway freed
+      if(!digitalRead(AIRWAY_IN))
+      {
+        Serial.println("Transitioning to Breathing state \n");
+        current_state = BREATHING;
+        trigger_sound(FX_AIRWAY_DONE);
+      }
+
       break;
 
     case BREATHING:
-      // STATE sensor comparisons and set actuators
-      if(false) // State transition statement
-      {
 
+      breatheBilaterally();
+      digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
+
+        int buttonState = digitalRead(PNEUMOTHORAX_IN);
+      //print_state(current_state);
+      Serial.print("  PT1: "); Serial.print(buttonState);
+      Serial.print("\n");
+
+      // Pneumothorax correct
+      if(digitalRead(PNEUMOTHORAX_IN))
+      {
+        digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
+        trigger_sound(FX_PNEUMOTHORAX_DONE);
+        Serial.println("Transitioning to Circulation state \n");
+        current_state = CIRCULATION;
       }
       break;
 
     case CIRCULATION:
-      // STATE sensor comparisons and set actuators
-      if(false) // State transition statement
-      {
 
+      breatheNormally();
+      digitalWrite(FX_BLEEDING, LOW);
+
+      // Bleeding stopped
+      //if(digitalRead(BLEEDING_IN))
+      if(digitalRead(BLEEDING_IN))
+      {
+        digitalWrite(FX_BLEEDING, HIGH);
+        Serial.println("Transitioning to IDLE state \n");
+        current_state = IDLE;
       }
       break;
 
+    case IDLE:  // DISABILITY and EXPOSURE
+
+      breatheNormally(true);
+
+      if(checkForPainResponse())
+      {
+          previous_time_stamp = millis();
+          current_state = PAIN_RESPONSE;
+          Serial.println("Transitioning to Pain Response state \n");
+      }
+
+      break;
+
+      
     case PAIN_RESPONSE:
 
-      // State transition condition
-      if(current_time - blink_time_stamp >= BLINKING_FREQ_MS)
+      digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
+
+      breatheInPain();
+
+      if(triggerArmOnPainResponse)
       {
-        Serial.println("Blink");
-        Serial.println(right_eye_pos);
-        if(get_eyelid_position('R') >= 60) // Right eye is open
-        {
-          set_eyelid_position('R', 80, 1);
-          blink_time_stamp = millis();
-        }
-        }
-        if((get_eyelid_position('R') < 40) && (millis() - blink_time_stamp >= 150))
-        {
-          
-        }
+        // Trigger right arm
+        digitalWrite(RIGHT_ARM_SIGNAL, HIGH);
+        delay(1000);
+        digitalWrite(RIGHT_ARM_SIGNAL, LOW);
+
+        // Set false to indicate already triggered
+        triggerArmOnPainResponse = false; 
+      }
+
+      if(time_interval_passed(blink_time_stamp, BLINKING_FREQ_MS))
+      {
+        Serial.println("Blinking");
+        blink();
+        blink_time_stamp = millis();
+      }
         
-
-        if(current_time - previous_time_stamp >= PAIN_STATE_TIME) 
-        {
-          current_state = IDLE;
-          previous_time_stamp = millis();
-          break;
-        }
-
-        // STATE sensor comparisons and set actuators
-        if((current_time - inhaling_time_stamp >= PAIN_RESPIRATORY_RATE_MS) && inhaling == false)
-        {
-          analogWrite(CHEST_LEFT, 255);
-          analogWrite(CHEST_RIGHT, 255);
-          inhaling_time_stamp = millis();
-          inhaling = true;
-          break;
-        }
-        else if((current_time - (inhaling_time_stamp) >= PAIN_INHALATION_SPEED) && inhaling == true)
-        {
-          analogWrite(CHEST_LEFT, 0);
-          analogWrite(CHEST_RIGHT, 0);
-          inhaling = false;
-          break;
-        }
-
-
-
-      case IDLE:
-        
-        
-        /* STATE sensor comparisons and set actuators
-        Breathing: Normal and bilateral breathing
-        */
-
-        Serial.println("In IDLE state \n");
+      if(time_interval_passed(previous_time_stamp, PAIN_STATE_TIME)) 
+      {
+        current_state = IDLE;
+        previous_time_stamp = millis();
+        triggerArmOnPainResponse = true; // Reset
+        digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
+      }
+      break;
       
-        if(right_eye_pos > (right_eye_lim[1] + 20)) // If right eye is open, close it
-        {
-          close_eye('R');
-        }else if(right_eye_pos <= (right_eye_lim[1] + 20))
-        {
-          fast_eyelid_stop('R');
-        }
-        if(left_eye_pos > (left_eye_lim[1] + 20))
-        {
-          close_eye('L', 40);
-        }else if(left_eye_pos <= (left_eye_lim[1] + 20))
-        {
-          fast_eyelid_stop('L');
-        }
-        if((current_time - inhaling_time_stamp >= IDLE_RESPIRATORY_RATE_MS) && inhaling == false)
-        {
-        //Serial.println("In loop \n");
-          analogWrite(CHEST_LEFT, 255);
-          analogWrite(CHEST_RIGHT, 255);
-          inhaling_time_stamp = millis();
-          inhaling = true;
-          break;
-        }
-        else if((current_time - (inhaling_time_stamp) >= RESPIRATORY_INHALATION_SPEED) && inhaling == true)
-        {
-        //Serial.println("In loop B \n");
-          analogWrite(CHEST_LEFT, 0);
-          analogWrite(CHEST_RIGHT, 0);
-          inhaling = false;
-          break;
-        }
-
-        if(current_time - pressure_time_stamp >= DELTA_T_PRESSURE_MS) // State transition statement
-        {
-          //Serial.print("State change \n");
-          pressure_time_stamp = millis();
-          current_pressure = analogRead(A0);
-        }
-
-        if(current_time - pressure_time_stamp >= DELTA_T2)
-        {
-          if((uint16_t)(analogRead(PRESSURE_SENS)) >= (current_pressure + DELTA_P_PRESSURE))
-          {
-            current_state = PAIN_RESPONSE;
-            previous_time_stamp = millis();
-            break;
-          }
-        }
-        
-
     default:
       break;
   }
-  
 }
 
-
-void printState(int state)
+bool checkForPainResponse()
 {
-  if(state == 0)
-  {
-    Serial.println("Airway");
-  }
-  else if(state == 1)
-  {
-    Serial.println("Breathing");
-  }
-  else if(state == 2)
-  {
-    Serial.println("Circulation");
-  }
-  else if(state == 3)
-  {
-    Serial.println("Pain response");
-  }
-  else if(state == 4)
-  {
-    Serial.println("Idle");
-  }
 
+    if(time_interval_passed(pressure_time_stamp, DELTA_T_PRESSURE_MS)){
+      pressure_time_stamp = millis();
+      current_pressure = analogRead(A0);
+    }
+
+    if(time_interval_passed(pressure_time_stamp, DELTA_T2)) {
+      if((uint16_t)(analogRead(PRESSURE_SENS)) >= (current_pressure + DELTA_P_PRESSURE)) {
+        return true;
+      }
+    }
+
+    return false;
 }
