@@ -11,9 +11,7 @@ const uint16_t PAIN_INHALATION_SPEED = 500;
 const uint32_t IDLE_RESPIRATORY_RATE_MS = (60UL*1000UL) / IDLE_RESPIRATORY_RATE; //ms between each breath in idle state
 const uint32_t PAIN_RESPIRATORY_RATE_MS = (60UL*1000UL) / PAIN_RESPIRATORY_RATE; //ms between each breath in pain response state
 
-static unsigned long previous_time_stamp{0};
 static bool inhaling = false;
-static unsigned long inhaling_time_stamp{0};
 
 // Starts the inhaling by opening valve
 // Parameter 'chest' can be 'R' for Right, 'L' for Left, or 'B' for Both.

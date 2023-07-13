@@ -39,7 +39,7 @@ bool time_interval_passed(unsigned long timestamp, unsigned long target_interval
 
 void trigger_sound(int fx_pin)
 {
-    digitalWrite(fx_pin, HIGH);
-    delay(250);
     digitalWrite(fx_pin, LOW);
+    delay(250);
+    digitalWrite(fx_pin, HIGH);
 }

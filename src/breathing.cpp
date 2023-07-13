@@ -2,6 +2,10 @@
 #include "breathing.h"
 #include "utils.h"
 
+
+static unsigned long inhaling_time_stamp{0};
+
+
 // Starts the inhaling process
 void startInhaling(char chest) {
   //Serial.println("Inhaling start");

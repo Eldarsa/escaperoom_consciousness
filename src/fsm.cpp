@@ -13,6 +13,7 @@ uint16_t current_pressure;
 static unsigned long pressure_time_stamp{0};
 static unsigned long blink_time_stamp{0};
 static unsigned long choking_sound_timestamp{0};
+static unsigned long pain_response_time_stamp{0};
 
 static bool triggerArmOnPainResponse = true;
 
@@ -54,7 +55,7 @@ void setup() {
   digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
   digitalWrite(FX_PNEUMOTHORAX_DONE, HIGH);
   digitalWrite(FX_BLEEDING, HIGH);
-  digitalWrite(FX_BREATHE_IN, HIGH), 
+  digitalWrite(FX_BREATHE_IN, HIGH); 
   digitalWrite(FX_BREATHE_OUT, HIGH);
   digitalWrite(FX_07_UNUSED, HIGH);
   digitalWrite(FX_08_UNUSED, HIGH);
@@ -62,7 +63,7 @@ void setup() {
   digitalWrite(FX_10_UNUSED, HIGH);
 
   current_state = INIT;
-  previous_time_stamp = millis();
+  pain_response_time_stamp = millis();
   temp_timestamp = millis();
   choking_sound_timestamp = millis();
   current_pressure = analogRead(A0);
@@ -85,8 +86,8 @@ void setup() {
 
 void loop() {
 
-
   switch(current_state){
+
     case INIT:
       init_eyes();
       current_state = AIRWAY;
@@ -118,11 +119,6 @@ void loop() {
       breatheBilaterally();
       digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
 
-        int buttonState = digitalRead(PNEUMOTHORAX_IN);
-      //print_state(current_state);
-      Serial.print("  PT1: "); Serial.print(buttonState);
-      Serial.print("\n");
-
       // Pneumothorax correct
       if(digitalRead(PNEUMOTHORAX_IN))
       {
@@ -147,20 +143,6 @@ void loop() {
         current_state = IDLE;
       }
       break;
-
-    case IDLE:  // DISABILITY and EXPOSURE
-
-      breatheNormally(true);
-
-      if(checkForPainResponse())
-      {
-          previous_time_stamp = millis();
-          current_state = PAIN_RESPONSE;
-          Serial.println("Transitioning to Pain Response state \n");
-      }
-
-      break;
-
       
     case PAIN_RESPONSE:
 
@@ -186,15 +168,28 @@ void loop() {
         blink_time_stamp = millis();
       }
         
-      if(time_interval_passed(previous_time_stamp, PAIN_STATE_TIME)) 
+      if(time_interval_passed(pain_response_time_stamp, PAIN_STATE_TIME)) 
       {
         current_state = IDLE;
-        previous_time_stamp = millis();
+        pain_response_time_stamp = millis();
         triggerArmOnPainResponse = true; // Reset
         digitalWrite(FX_PNEUMOTHORAX_BREATHING, HIGH);
       }
       break;
-      
+
+    case IDLE:  // DISABILITY and EXPOSURE
+
+      breatheNormally(true);
+
+      if(checkForPainResponse())
+      {
+          pain_response_time_stamp = millis();
+          current_state = PAIN_RESPONSE;
+          Serial.println("Transitioning to Pain Response state \n");
+      }
+
+      break;
+    
     default:
       break;
   }
