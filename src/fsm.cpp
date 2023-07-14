@@ -35,6 +35,7 @@ void setup() {
   pinMode(RIGHT_ARM_SIGNAL, OUTPUT);
   pinMode(PNEUMOTHORAX_IN, INPUT); // NOT USED YET
   pinMode(AIRWAY_IN, INPUT);
+  pinMode(BLEEDING_IN, INPUT);
 
   // Sound effect pins
   pinMode(FX_AIRWAY_OBSTRUCTION, OUTPUT);
