@@ -1,3 +1,12 @@
+/**
+ * @file    eyes.cpp
+ * @author  Eldar Sandanger
+ * @email   Eldar.sandanger@gmail.com
+ * @date    July 31, 2023
+ * @brief   This file implements the functionalities related to the eyes of the Escape Room patient,
+ *          which include the calibration and movement of the eye lids.
+ */
+
 #include "defines.h"
 #include "eyes.h"
 
@@ -6,6 +15,12 @@ static unsigned long left_eye_pos{0};
 static unsigned long right_eye_lim[2];
 static unsigned long left_eye_lim[2];
 
+/**
+ * @brief Stop the movement of eyelid(s)
+ * 
+ * @param eye Character that represents which eye to stop ('R' for right, 'L' for left, 'B' for both)
+ * @param fast Boolean that represents if stop is fast or not
+ */
 void eyelid_stop(char eye, bool fast)
 {
   // 'B' for 'Both'
@@ -32,6 +47,11 @@ void eyelid_stop(char eye, bool fast)
   }
 }
 
+/**
+ * @brief Fast stop of eyelid(s)
+ * 
+ * @param eye Character that represents which eye to stop ('R' for right, 'L' for left, 'B' for both)
+ */
 void fast_eyelid_stop(char eye)
 {
   // 'B' for 'Both'
@@ -51,6 +71,13 @@ void fast_eyelid_stop(char eye)
   }
 }
 
+/**
+ * @brief Find limit of eyelid(s) based on direction
+ * 
+ * @param eye Character that represents which eye to control ('R' for right, 'L' for left)
+ * @param dir Character that represents direction ('U' for up, 'D' for down)
+ * @return int Limit value found
+ */
 int find_eyelid_limit(char eye, char dir){
 
   bool limitFound;
@@ -145,10 +172,14 @@ int find_eyelid_limit(char eye, char dir){
   return limit;
 }
 
-///   pos = reference as a value between 0 and 100
-///     - 100 => 100% open
-///     - 0   => 0% open
-///   speed = duty cycle value between 0 and 255
+/**
+ * @brief Set the eyelid position
+ * 
+ * @param eye Character that represents which eye to control ('R' for right, 'L' for left, 'B' for both)
+ * @param targetPos Target position value (between 0 and 100)
+ * @param speed Duty cycle value (between 0 and 255)
+ * @return int Status of setting position (0 indicates success)
+ */
 int set_eyelid_position(char eye, int targetPos, int speed)
 {
   int readPinRight, readPinLeft; 
@@ -213,11 +244,17 @@ int set_eyelid_position(char eye, int targetPos, int speed)
   return 0;
 }
 
-/* Helper function for set_eyelid_position that sets the motor signals-
- *
- * Returns:
- * true if the desired position has been reached, false otherwise.
- * Stops the motor once target position is achieved.
+
+/**
+ * @brief Drive eyelid to a given position
+ * 
+ * @param eye Character that represents which eye to control
+ * @param currentPos Current position value
+ * @param targetPos Target position value
+ * @param speed Duty cycle value
+ * @param upDrivePin Up driving pin number
+ * @param downDrivePin Down driving pin number
+ * @return bool Returns true if desired position has been reached, false otherwise
  */
 bool drive_eyelid_to_position(char eye, int currentPos, int targetPos, int speed, int upDrivePin, int downDrivePin)
 {
@@ -244,9 +281,12 @@ bool drive_eyelid_to_position(char eye, int currentPos, int targetPos, int speed
   }
 }
 
-///  Returns positions as a value between 0 and 100
-///     - 100 => 100% open
-///     - 0   => 0% open
+/**
+ * @brief Get eyelid position
+ * 
+ * @param eye Character that represents which eye's position to get ('R' for right, 'L' for left)
+ * @return int Position value between 0 and 100
+ */
 int get_eyelid_position(char eye)
 {
   int readPin, potMin, potMax;
@@ -273,18 +313,33 @@ int get_eyelid_position(char eye)
   return map(analogRead(readPin), potMin, potMax, 0, 100);
 }
 
-// Convenience function
+/**
+ * @brief Close eye
+ * 
+ * @param eye Character that represents which eye to close ('R' for right, 'L' for left, 'B' for both)
+ * @param speed Speed at which the eye should close
+ */
 void close_eye(char eye, int speed)
 {
   set_eyelid_position(eye, 0, speed);   // '0' implies 0% open
 }
 
-// Convenience function
+/**
+ * @brief Open eye
+ * 
+ * @param eye Character that represents which eye to open ('R' for right, 'L' for left, 'B' for both)
+ * @param speed Speed at which the eye should open
+ */
 void open_eye(char eye, int speed)
 {
   set_eyelid_position(eye, 100, speed);  // '100' implies 100% open
 }
 
+/**
+ * @brief Perform blink action
+ * 
+ * @param openDelay Delay before reopening eyes
+ */
 void blink(int openDelay)
 {
   set_eyelid_position('B', 0, 150);
@@ -295,6 +350,9 @@ void blink(int openDelay)
   set_eyelid_position('B', 100, 150);
 }
 
+/**
+ * @brief Initialize eyes
+ */
 void init_eyes()
 {
   Serial.println("Initializing eyes... ");
@@ -322,37 +380,4 @@ void init_eyes()
 
   Serial.println("Eyes initiated.");
 
-}
-
-void test_eyes()
-{
-  Serial.println("Eye test ");
-
-  right_eye_pos = analogRead(EYE_LID_POS_RIGHT);
-  left_eye_pos = analogRead(EYE_LID_POS_LEFT);
-
-  analogWrite(ONE_A, 0);
-  analogWrite(TWO_A, 0);
-  analogWrite(ONE_B, 0);
-  analogWrite(TWO_B, 0);
-
-  Serial.println("Enabling left");
-  digitalWrite(ENABLE_L, 1);
-  digitalWrite(ENABLE_R, 1);
-
-
-  int  upDrivePin = ONE_B;
-  int  downDrivePin = TWO_B;
-  int  readPin = EYE_LID_POS_LEFT;
-
-  int UP_SPEED = 200;
-  int DOWN_SPEED = 200;
-
-  analogWrite(upDrivePin, UP_SPEED);
-
-  delay(5000);
-
-  analogWrite(upDrivePin, 0);
-
-  //analogWrite(downDrivePin, DOWN_SPEED);
 }
