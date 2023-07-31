@@ -1,9 +1,22 @@
+/*
+ * Author:     Eldar Sandanger
+ * Email:      Eldar.sandanger@gmail.com
+ * Created:    July 31, 2023
+ *
+ * Description:
+ * This file implements the main setup and loop of the Arduino Mega, which controls the flow
+ * of a finite state machine that changes its state throughout the game. 
+ */
+
+
+
 #include <Arduino.h>
 #include "fsm.h"
 #include "eyes.h"
 #include "breathing.h"
 #include "utils.h"
 #include "defines.h"
+
 
 static state current_state;
 
@@ -16,7 +29,6 @@ static unsigned long choking_sound_timestamp{0};
 static unsigned long pain_response_time_stamp{0};
 
 static bool triggerArmOnPainResponse = true;
-
 
 void setup() {
   TCCR2B = TCCR2B & (B11111000 | B00000001); // Set D9 and D10 pin to 30 kHz
@@ -117,6 +129,9 @@ void loop() {
 
     case BREATHING:
 
+      // In this state the patient should be breathing bilaterally as of a Pneumothorax issue. 
+      // A wheezing breathing sound is playing to indicate something wrong with the lungs. 
+
       breatheBilaterally();
       digitalWrite(FX_PNEUMOTHORAX_BREATHING, LOW);
 
@@ -132,11 +147,13 @@ void loop() {
 
     case CIRCULATION:
 
+    // In this state the patient should be breathing normally, but start bleeding from the wound.
+    // A sound is played of a man moaning, indicating pain
+
       breatheNormally();
-      digitalWrite(FX_BLEEDING, LOW);
+      digitalWrite(FX_BLEEDING, LOW); // Can be done once
 
       // Bleeding stopped
-      //if(digitalRead(BLEEDING_IN))
       if(digitalRead(BLEEDING_IN))
       {
         digitalWrite(FX_BLEEDING, HIGH);
